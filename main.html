@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Treningi Oddechowe</title>
+    <!-- Tailwind CSS for modern, responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1b2a;
+            color: #e0e7ff;
+        }
+        .breathing-card {
+            background-color: #1e293b;
+            border: 2px solid #4a90e2;
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+        }
+        .breathing-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 10px 25px rgba(74, 144, 226, 0.4);
+        }
+        .btn {
+            transition: background-color 0.3s ease-in-out, transform 0.2s ease-in-out;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <main class="w-full max-w-4xl p-8 md:p-12 rounded-2xl shadow-2xl border-2 border-cyan-500 relative bg-gray-900">
+        <!-- Main Heading and Introduction -->
+        <header class="text-center mb-12">
+            <h1 class="text-5xl font-extrabold mb-4 text-cyan-400">Wybierz Swój Trening</h1>
+            <p class="text-xl text-gray-300 max-w-2xl mx-auto">
+                Wybierz metodę treningu oddechowego, która najlepiej odpowiada Twoim celom. Każda z nich oferuje unikalne podejście do poprawy kontroli nad oddechem i relaksacji.
+            </p>
+        </header>
+
+        <!-- Cards Container -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+            <!-- Card 1: Freediving App -->
+            <div class="breathing-card rounded-2xl p-6 flex flex-col items-center text-center">
+                <h2 class="text-3xl font-bold text-teal-300 mb-2">Trening Freedivingu</h2>
+                <p class="text-gray-400 mb-4 flex-grow">
+                    Ten asystent pomoże Ci w ćwiczeniach oddechowych do freedivingu, inspirowany tutorialem Adama Sterna. Skupia się na sekwencji wdechu, wstrzymania i wydechu.
+                </p>
+                <!-- This button will open the existing app. Replace 'AsystentOddychania.html' with the actual file path if it's different. -->
+                <a href="AsystentOddychania.html" target="_blank" class="w-full py-3 px-6 mt-4 bg-blue-600 hover:bg-blue-700 rounded-lg text-lg font-semibold btn shadow-lg">
+                    Rozpocznij Trening Freedivingu
+                </a>
+            </div>
+
+            <!-- Card 2: Wim Hof App -->
+            <div class="breathing-card rounded-2xl p-6 flex flex-col items-center text-center">
+                <h2 class="text-3xl font-bold text-teal-300 mb-2">Metoda Wima Hofa</h2>
+                <p class="text-gray-400 mb-4 flex-grow">
+                    Aplikacja prowadzi przez cykle oddechowe metody Wima Hofa, składające się z faz głębokich oddechów, po których następuje wstrzymanie.
+                </p>
+                <!-- This button will open the existing app. Replace 'WimHof.html' with the actual file path. -->
+                <a href="WimHof.html" target="_blank" class="w-full py-3 px-6 mt-4 bg-blue-600 hover:bg-blue-700 rounded-lg text-lg font-semibold btn shadow-lg">
+                    Rozpocznij Trening Wima Hofa
+                </a>
+            </div>
+
+            <!-- Card 3: 4-Minute Hold App -->
+            <div class="breathing-card rounded-2xl p-6 flex flex-col items-center text-center">
+                <h2 class="text-3xl font-bold text-teal-300 mb-2">Wstrzymanie Oddechu (4 min)</h2>
+                <p class="text-gray-400 mb-4 flex-grow">
+                    Ten asystent pomaga w treningu jednorazowego, długiego wstrzymania oddechu w 4-minutowym cyklu, z serią oddechów przygotowawczych.
+                </p>
+                <!-- This button will open the existing app. Replace 'Wstrzymnanie_oddechu_4min.html' with the actual file path. -->
+                <a href="Wstrzymnanie_oddechu_4min.html" target="_blank" class="w-full py-3 px-6 mt-4 bg-blue-600 hover:bg-blue-700 rounded-lg text-lg font-semibold btn shadow-lg">
+                    Rozpocznij 4-minutowy Hold
+                </a>
+            </div>
+
+        </div>
+
+    </main>
+
+</body>
+</html>

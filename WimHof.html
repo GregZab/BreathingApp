@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wim Hof Breathing App</title>
+    <!-- Tailwind CSS for modern, responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js for web audio synthesis -->
+    <script src="https://unpkg.com/tone@14.7.58/build/Tone.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1b2a;
+            color: #e0e7ff;
+        }
+        .breathing-circle {
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            border: 4px solid #4a90e2;
+            box-shadow: 0 0 20px #4a90e2;
+            transition: transform 0.5s ease-in-out;
+        }
+        .breathing-circle.active {
+            animation: pulse 1s linear infinite;
+        }
+        .breathe-in {
+            transform: scale(1.2);
+        }
+        .breathe-out {
+            transform: scale(0.8);
+        }
+        .status-message {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .info-modal {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 30;
+        }
+        .info-content {
+            background-color: #1e293b;
+            padding: 2rem;
+            border-radius: 1rem;
+            max-width: 500px;
+            text-align: center;
+            border: 2px solid #4a90e2;
+            position: relative;
+        }
+        .info-close-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #e0e7ff;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="bg-gray-800 p-8 md:p-12 rounded-2xl shadow-2xl w-full max-w-2xl border-2 border-cyan-500 relative">
+        <h1 class="text-4xl font-extrabold mb-4 text-center text-cyan-400">Metoda Wima Hofa</h1>
+        <p class="text-gray-300 text-center mb-8">
+            Ten asystent poprowadzi Cię przez cykle oddechowe metody Wima Hofa.
+        </p>
+
+        <!-- Information Icon Button at the top right -->
+        <button id="infoBtn" class="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors duration-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>
+        </button>
+
+        <div class="flex flex-col items-center justify-center space-y-8">
+            <!-- Breathing Circle -->
+            <div id="breathingCircle" class="breathing-circle bg-blue-500 bg-opacity-30 flex items-center justify-center">
+                <p id="statusText" class="status-message text-center text-cyan-200">Gotowy?</p>
+            </div>
+
+            <!-- Timers and Instructions -->
+            <div class="text-center">
+                <div id="cycleTimer" class="text-6xl font-bold text-teal-400 mb-2">00:00</div>
+                <p id="instructionText" class="text-lg text-gray-400 mt-4">Kliknij "Start", aby rozpocząć.</p>
+                <p id="cycleCount" class="text-sm text-gray-500 hidden"></p>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex flex-wrap justify-center gap-4">
+                <button id="startBtn" class="py-3 px-6 bg-green-600 hover:bg-green-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg">
+                    Start
+                </button>
+                <button id="stopBtn" class="py-3 px-6 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg hidden">
+                    Zakończ
+                </button>
+                <button id="resetBtn" class="py-3 px-6 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg hidden">
+                    Reset
+                </button>
+            </div>
+        </div>
+        
+        <!-- Settings Panel below main content -->
+        <div id="settingsPanel" class="mt-8 p-6 rounded-2xl shadow-inner border border-gray-700 bg-gray-900 w-full flex flex-col items-start space-y-4">
+            <h2 class="text-2xl font-bold text-teal-300">Ustawienia</h2>
+            
+            <label class="block w-full">
+                <span class="text-gray-300">Liczba cykli:</span>
+                <input type="number" id="numCyclesInput" value="3" min="1" max="10" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+            
+            <label class="block w-full">
+                <span class="text-gray-300">Liczba oddechów na cykl:</span>
+                <input type="number" id="breathsPerCycleInput" value="30" min="10" max="50" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+
+            <h3 class="text-lg font-semibold text-gray-300 mt-4">Czasy wstrzymania po wydechu (w sekundach)</h3>
+            <label class="block w-full">
+                <span class="text-gray-400">Cykl 1:</span>
+                <input type="number" id="exhaleHoldCycle1" value="60" min="1" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+            <label class="block w-full">
+                <span class="text-gray-400">Cykl 2:</span>
+                <input type="number" id="exhaleHoldCycle2" value="90" min="1" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+            <label class="block w-full">
+                <span class="text-gray-400">Cykl 3:</span>
+                <input type="number" id="exhaleHoldCycle3" value="120" min="1" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+
+            <label class="block w-full mt-4">
+                <span class="text-gray-300">Wstrzymanie po wdechu (sekundy):</span>
+                <input type="number" id="inhaleHoldDurationInput" value="15" min="1" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+
+            <div class="w-full">
+                <span class="text-gray-300 block mb-2">Prędkość oddechu:</span>
+                <div class="flex space-x-2">
+                    <button id="slowSpeedBtn" class="py-2 px-4 rounded-md bg-gray-700 hover:bg-gray-600 transition-colors">Wolno</button>
+                    <button id="normalSpeedBtn" class="py-2 px-4 rounded-md bg-gray-700 hover:bg-gray-600 transition-colors">Normalnie</button>
+                    <button id="fastSpeedBtn" class="py-2 px-4 rounded-md bg-gray-700 hover:bg-gray-600 transition-colors">Szybko</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer with credit -->
+        <div class="mt-8 text-center text-gray-500 text-sm">
+            Made by Greg
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div id="infoModal" class="info-modal">
+        <div class="info-content">
+            <button id="infoCloseBtn" class="info-close-btn">&times;</button>
+            <h2 class="text-2xl font-bold text-teal-300 mb-4">Informacje o aplikacji</h2>
+            <p class="text-gray-300 mb-4">
+                Ta aplikacja prowadzi przez kontrolowany cykl oddychania, składający się z faz głębokich wdechów i wydechów, po których następuje wstrzymanie oddechu.
+            </p>
+            <p class="text-gray-300 text-sm">
+                Ćwiczenia są inspirowane metodą oddechową Wima Hofa, mającą na celu zwiększenie energii i odporności.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const breathingCircle = document.getElementById('breathingCircle');
+            const statusText = document.getElementById('statusText');
+            const cycleTimerDisplay = document.getElementById('cycleTimer');
+            const instructionText = document.getElementById('instructionText');
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const infoBtn = document.getElementById('infoBtn');
+            const infoModal = document.getElementById('infoModal');
+            const infoCloseBtn = document.getElementById('infoCloseBtn');
+
+            const numCyclesInput = document.getElementById('numCyclesInput');
+            const breathsPerCycleInput = document.getElementById('breathsPerCycleInput');
+            const exhaleHoldCycle1Input = document.getElementById('exhaleHoldCycle1');
+            const exhaleHoldCycle2Input = document.getElementById('exhaleHoldCycle2');
+            const exhaleHoldCycle3Input = document.getElementById('exhaleHoldCycle3');
+            const inhaleHoldDurationInput = document.getElementById('inhaleHoldDurationInput');
+
+            const slowSpeedBtn = document.getElementById('slowSpeedBtn');
+            const normalSpeedBtn = document.getElementById('normalSpeedBtn');
+            const fastSpeedBtn = document.getElementById('fastSpeedBtn');
+
+            const cycleCountDisplay = document.getElementById('cycleCount');
+
+            let isRunning = false;
+            let currentCycle = 0;
+            let currentBreath = 0;
+            let cycleTimer = 0;
+            let intervalId;
+            let breathIntervalId;
+            let breathSpeed = 2000; // 2s per breath (1s in, 1s out)
+
+            // Tone.js
+            const synth = new Tone.Synth().toDestination();
+            
+            // Function to play a gentle 'breathe in' sound (rising tone)
+            function playInhaleSound() {
+                synth.triggerAttackRelease("C4", "8n");
+            }
+            
+            // Function to play a gentle 'breathe out' sound (falling tone)
+            function playExhaleSound() {
+                synth.triggerAttackRelease("G3", "8n");
+            }
+            
+            // Function to play a signal for end of hold
+            function playEndHoldSound() {
+                synth.triggerAttackRelease("A4", "8n");
+            }
+
+            // Function to play a signal for inhale hold
+            function playInhaleHoldSound() {
+                synth.triggerAttackRelease("C5", "8n");
+            }
+
+
+            function updateCycleTimer() {
+                cycleTimer++;
+                const minutes = Math.floor(cycleTimer / 60);
+                const seconds = cycleTimer % 60;
+                cycleTimerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }
+
+            function startBreathingPhase() {
+                let breathsLeft = parseInt(breathsPerCycleInput.value);
+                statusText.textContent = `Wdech / Wydech (${breathsLeft}x)`;
+                instructionText.textContent = "Wykonuj szybkie i głębokie oddechy...";
+                breathingCircle.classList.add('active');
+
+                let isBreathingIn = true;
+                breathIntervalId = setInterval(() => {
+                    if (isBreathingIn) {
+                        breathingCircle.classList.remove('breathe-out');
+                        breathingCircle.classList.add('breathe-in');
+                        isBreathingIn = false;
+                        playInhaleSound();
+                    } else {
+                        breathingCircle.classList.remove('breathe-in');
+                        breathingCircle.classList.add('breathe-out');
+                        breathsLeft--;
+                        isBreathingIn = true;
+                        playExhaleSound();
+                    }
+
+                    if (breathsLeft > 0) {
+                        statusText.textContent = `Wdech / Wydech (${breathsLeft}x)`;
+                    }
+
+                    if (breathsLeft <= 0) {
+                        clearInterval(breathIntervalId);
+                        startExhaleHold();
+                    }
+                }, breathSpeed);
+            }
+
+            function startExhaleHold() {
+                breathingCircle.classList.remove('active', 'breathe-in', 'breathe-out');
+                statusText.textContent = "Wstrzymanie po wydechu";
+                instructionText.textContent = "Wydech. Trzymaj tak długo, jak możesz.";
+                
+                let holdDuration = 0;
+                if (currentCycle === 1) {
+                    holdDuration = parseInt(exhaleHoldCycle1Input.value);
+                } else if (currentCycle === 2) {
+                    holdDuration = parseInt(exhaleHoldCycle2Input.value);
+                } else if (currentCycle === 3) {
+                    holdDuration = parseInt(exhaleHoldCycle3Input.value);
+                } else {
+                    // For cycles > 3, use the last set value or default
+                    holdDuration = parseInt(exhaleHoldCycle3Input.value) || 120;
+                }
+
+                let holdTime = holdDuration;
+                let holdTimerId = setInterval(() => {
+                    instructionText.textContent = `Pozostało: ${holdTime}s`;
+                    holdTime--;
+                    if (holdTime < 0) {
+                        clearInterval(holdTimerId);
+                        playEndHoldSound(); // Sygnał końca wstrzymania po wydechu
+                        setTimeout(() => {
+                            startInhaleHold();
+                        }, 2000); // Mała przerwa przed kolejną fazą
+                    }
+                }, 1000);
+            }
+
+            function startInhaleHold() {
+                statusText.textContent = "Wdech + Wstrzymanie";
+                instructionText.textContent = "Weź głęboki wdech i wstrzymaj (15s).";
+                playInhaleHoldSound(); // Sygnał do wzięcia oddechu i wstrzymania
+
+                let holdTime = parseInt(inhaleHoldDurationInput.value);
+                let holdTimerId = setInterval(() => {
+                    instructionText.textContent = `Wstrzymanie: ${holdTime}s`;
+                    holdTime--;
+                    if (holdTime < 0) {
+                        clearInterval(holdTimerId);
+                        startNextCycle();
+                    }
+                }, 1000);
+            }
+
+            function startNextCycle() {
+                if (currentCycle < parseInt(numCyclesInput.value)) {
+                    currentCycle++;
+                    cycleCountDisplay.textContent = `Cykl ${currentCycle}/${numCyclesInput.value}`;
+                    startBreathingPhase();
+                } else {
+                    endSession();
+                }
+            }
+
+            function startSession() {
+                if (isRunning) return;
+                isRunning = true;
+                startBtn.classList.add('hidden');
+                stopBtn.classList.remove('hidden');
+                resetBtn.classList.add('hidden');
+                cycleCountDisplay.classList.remove('hidden');
+                
+                Tone.start();
+                currentCycle = 0;
+                cycleTimer = 0;
+                intervalId = setInterval(updateCycleTimer, 1000);
+                startNextCycle();
+            }
+
+            function endSession() {
+                isRunning = false;
+                clearInterval(intervalId);
+                if (breathIntervalId) clearInterval(breathIntervalId);
+                statusText.textContent = "Trening zakończony!";
+                instructionText.textContent = `Gratulacje! Ukończyłeś wszystkie ${numCyclesInput.value} cykle.`;
+                resetBtn.classList.remove('hidden');
+                stopBtn.classList.add('hidden');
+            }
+
+            function resetApp() {
+                isRunning = false;
+                clearInterval(intervalId);
+                if (breathIntervalId) clearInterval(breathIntervalId);
+                cycleTimer = 0;
+                currentCycle = 0;
+                currentBreath = 0;
+                updateCycleTimer();
+                
+                breathingCircle.classList.remove('active', 'hold', 'breathe-in', 'breathe-out');
+                statusText.textContent = 'Gotowy?';
+                instructionText.textContent = 'Kliknij "Start", aby rozpocząć.';
+                cycleCountDisplay.classList.add('hidden');
+                
+                startBtn.classList.remove('hidden');
+                stopBtn.classList.add('hidden');
+                resetBtn.classList.add('hidden');
+            }
+
+            // Event Listeners
+            startBtn.addEventListener('click', startSession);
+            stopBtn.addEventListener('click', endSession);
+            resetBtn.addEventListener('click', resetApp);
+            infoBtn.addEventListener('click', () => infoModal.style.display = 'flex');
+            infoCloseBtn.addEventListener('click', () => infoModal.style.display = 'none');
+
+            slowSpeedBtn.addEventListener('click', () => { 
+                breathSpeed = 4000;
+            });
+            normalSpeedBtn.addEventListener('click', () => { 
+                breathSpeed = 2000;
+            });
+            fastSpeedBtn.addEventListener('click', () => { 
+                breathSpeed = 1000;
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asystent Oddychania Freediving</title>
+    <!-- Tailwind CSS for modern, responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js for web audio synthesis -->
+    <script src="https://unpkg.com/tone@14.7.58/build/Tone.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1b2a;
+            color: #e0e7ff;
+        }
+        .breathing-circle {
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            border: 4px solid #4a90e2;
+            box-shadow: 0 0 20px #4a90e2;
+            transition: transform 6s ease-in-out, opacity 0.5s ease-in-out;
+        }
+        .breathe-in {
+            transform: scale(1.2);
+            box-shadow: 0 0 40px #4a90e2;
+        }
+        .breathe-out {
+            transform: scale(0.8);
+            box-shadow: 0 0 10px #4a90e2;
+        }
+        .hold {
+            transform: scale(1);
+            box-shadow: 0 0 30px #4a90e2;
+        }
+        .status-message {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .pulsing {
+            animation: pulse 1s linear infinite;
+        }
+        /* Style for the settings button and panel */
+        .settings-btn {
+            background-color: #1e293b;
+            padding: 0.5rem;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 10;
+        }
+        .settings-panel {
+            position: absolute;
+            top: 0;
+            right: -100%; /* Start off-screen */
+            height: 100%;
+            width: 300px;
+            background-color: #1e293b;
+            border-left: 2px solid #4a90e2;
+            transition: right 0.3s ease-in-out;
+            z-index: 20;
+            padding: 2rem;
+        }
+        .settings-panel.open {
+            right: 0;
+        }
+
+        /* Style for the info modal */
+        .info-modal {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none; /* Changed from hidden to none */
+            align-items: center;
+            justify-content: center;
+            z-index: 30;
+        }
+        .info-content {
+            background-color: #1e293b;
+            padding: 2rem;
+            border-radius: 1rem;
+            max-width: 500px;
+            text-align: center;
+            border: 2px solid #4a90e2;
+            position: relative;
+        }
+        .info-close-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #e0e7ff;
+        }
+
+        /* Loading spinner */
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="bg-gray-800 p-8 md:p-12 rounded-2xl shadow-2xl w-full max-w-2xl border-2 border-cyan-500 relative">
+        <h1 class="text-4xl font-extrabold mb-4 text-center text-cyan-400">Asystent Oddychania Freediving</h1>
+        <p class="text-gray-300 text-center mb-8">
+            Ten asystent pomoże Ci w ćwiczeniach oddechowych do freedivingu, inspirowany tutorialem, do którego się odwołałeś.
+        </p>
+
+        <!-- Information Icon Button at the top right -->
+        <button id="infoBtn" class="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors duration-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>
+        </button>
+
+        <div class="flex flex-col items-center justify-center space-y-8">
+            <!-- Breathing Circle -->
+            <div id="breathingCircle" class="breathing-circle bg-blue-500 bg-opacity-30 flex items-center justify-center transition-all duration-1000">
+                <p id="statusText" class="status-message text-center text-cyan-200">Gotowy?</p>
+            </div>
+
+            <!-- Timer and Instructions -->
+            <div class="text-center">
+                <div id="timer" class="text-6xl font-bold text-teal-400 mb-2">00:00</div>
+                <p id="instructionText" class="text-lg text-gray-400">Kliknij "Start", aby rozpocząć ćwiczenie.</p>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex flex-wrap justify-center gap-4">
+                <button id="startBtn" class="py-3 px-6 bg-green-600 hover:bg-green-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg">
+                    Start
+                </button>
+                <button id="pauseBtn" class="py-3 px-6 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg hidden">
+                    Pauza
+                </button>
+                <button id="resetBtn" class="py-3 px-6 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg hidden">
+                    Reset
+                </button>
+                <button id="settingsBtn" class="py-3 px-4 bg-gray-600 hover:bg-gray-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg">
+                    Ustawienia
+                </button>
+                <button id="soundToggleBtn" class="py-3 px-4 bg-gray-600 hover:bg-gray-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg">
+                    Dźwięk Włączony
+                </button>
+            </div>
+        </div>
+
+        <!-- Gemini API features section -->
+        <div class="mt-12 text-center space-y-4">
+            <h2 class="text-2xl font-bold text-cyan-400">✨ Funkcje AI</h2>
+            <div class="flex flex-col md:flex-row justify-center items-center space-y-4 md:space-y-0 md:space-x-4">
+                <button id="generateTipsBtn" class="w-full md:w-auto py-3 px-6 bg-purple-600 hover:bg-purple-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg flex items-center justify-center space-x-2">
+                    <span id="generateTipsBtnText">Wygeneruj Porady</span>
+                    <span id="tipsLoader" class="loader hidden"></span>
+                </button>
+                <button id="generateMotivationBtn" class="w-full md:w-auto py-3 px-6 bg-orange-600 hover:bg-orange-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg flex items-center justify-center space-x-2">
+                    <span id="generateMotivationBtnText">Wygeneruj Motywację</span>
+                    <span id="motivationLoader" class="loader hidden"></span>
+                </button>
+            </div>
+            
+            <div id="aiResponseContainer" class="mt-6 p-4 rounded-lg text-left bg-gray-700 hidden">
+                <p id="aiResponseText" class="text-gray-200"></p>
+            </div>
+        </div>
+
+
+        <!-- Settings Panel -->
+        <div id="settingsPanel" class="settings-panel flex flex-col items-start space-y-4">
+            <h2 class="text-2xl font-bold text-teal-300">Ustawienia</h2>
+            <label class="block w-full">
+                <span class="text-gray-300">Wdech (sekundy):</span>
+                <input type="number" id="breatheInDuration" value="4" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+            <label class="block w-full">
+                <span class="text-gray-300">Wstrzymanie (sekundy):</span>
+                <input type="number" id="holdDuration" value="4" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+            <label class="block w-full">
+                <span class="text-gray-300">Wydech (sekundy):</span>
+                <input type="number" id="breatheOutDuration" value="6" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+            <label class="block w-full">
+                <span class="text-gray-300">Liczba cykli:</span>
+                <input type="number" id="numCycles" value="3" min="1" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+            <button id="closeSettingsBtn" class="w-full py-2 px-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg">
+                Zamknij
+            </button>
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div id="infoModal" class="info-modal hidden">
+        <div class="info-content">
+            <button id="infoCloseBtn" class="info-close-btn">&times;</button>
+            <h2 class="text-2xl font-bold text-teal-300 mb-4">Informacje o aplikacji</h2>
+            <p class="text-gray-300 mb-4">
+                Ta aplikacja została stworzona, aby pomóc w ćwiczeniach oddechowych do freedivingu. Opiera się na technikach i wiedzy,
+                które mają na celu wydłużenie czasu wstrzymania oddechu i poprawę relaksacji.
+            </p>
+            <p class="text-gray-300 text-sm">
+                Ćwiczenia są inspirowane poradnikiem wideo "How to Hold Your Breath Longer: a freediving tutorial from a professional freediver"
+                autorstwa Adama Sterna. Cała zasługa za tę metodę należy do niego.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const breathingCircle = document.getElementById('breathingCircle');
+            const statusText = document.getElementById('statusText');
+            const timerDisplay = document.getElementById('timer');
+            const instructionText = document.getElementById('instructionText');
+            const startBtn = document.getElementById('startBtn');
+            const pauseBtn = document.getElementById('pauseBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const settingsBtn = document.getElementById('settingsBtn');
+            const soundToggleBtn = document.getElementById('soundToggleBtn');
+            const settingsPanel = document.getElementById('settingsPanel');
+            const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+            const infoBtn = document.getElementById('infoBtn');
+            const infoModal = document.getElementById('infoModal');
+            const infoCloseBtn = document.getElementById('infoCloseBtn');
+            const generateTipsBtn = document.getElementById('generateTipsBtn');
+            const generateTipsBtnText = document.getElementById('generateTipsBtnText');
+            const tipsLoader = document.getElementById('tipsLoader');
+            const generateMotivationBtn = document.getElementById('generateMotivationBtn');
+            const generateMotivationBtnText = document.getElementById('generateMotivationBtnText');
+            const motivationLoader = document.getElementById('motivationLoader');
+            const aiResponseContainer = document.getElementById('aiResponseContainer');
+            const aiResponseText = document.getElementById('aiResponseText');
+
+            const breatheInInput = document.getElementById('breatheInDuration');
+            const holdInput = document.getElementById('holdDuration');
+            const breatheOutInput = document.getElementById('breatheOutDuration');
+            const numCyclesInput = document.getElementById('numCycles');
+
+            let timer = 0;
+            let isRunning = false;
+            let intervalId;
+            let stageIndex = 0;
+            let stageTimer = 0;
+            let currentCycle = 0;
+            let soundOn = true;
+
+            // Initialize Tone.js for audio feedback
+            const synth = new Tone.Synth().toDestination();
+
+            // Function to play a gentle 'breathe in' sound (rising tone)
+            function playBreatheInSound() {
+                if (soundOn) {
+                    synth.triggerAttackRelease("C4", "8n");
+                }
+            }
+
+            // Function to play a gentle 'breathe out' sound (falling tone)
+            function playBreatheOutSound() {
+                if (soundOn) {
+                    synth.triggerAttackRelease("G3", "8n");
+                }
+            }
+
+            let stages = [];
+
+            function updateStages() {
+                const breatheInDur = parseInt(breatheInInput.value);
+                const holdDur = parseInt(holdInput.value);
+                const breatheOutDur = parseInt(breatheOutInput.value);
+                const numCycles = parseInt(numCyclesInput.value);
+
+                stages = [
+                    { name: 'Wdech', duration: breatheInDur, action: 'breathe-in', instruction: 'Głęboki wdech...', sound: playBreatheInSound },
+                    { name: 'Wstrzymanie', duration: holdDur, action: 'hold', instruction: 'Wstrzymaj oddech...', sound: null },
+                    { name: 'Wydech', duration: breatheOutDur, action: 'breathe-out', instruction: 'Powolny wydech...', sound: playBreatheOutSound },
+                    { name: 'Wstrzymanie (puste płuca)', duration: 4, action: 'hold', instruction: 'Wstrzymaj ponownie...', sound: null }
+                ];
+            }
+
+            updateStages(); // Initialize stages with default values
+
+            // Function to update the timer display
+            function updateTimerDisplay() {
+                const minutes = Math.floor(timer / 60);
+                const seconds = timer % 60;
+                timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }
+
+            // Function to run the breathing cycle
+            function runBreathingCycle() {
+                if (!isRunning) return;
+
+                const currentStage = stages[stageIndex];
+                
+                // Update circle and text based on the stage
+                breathingCircle.classList.remove('breathe-in', 'breathe-out', 'hold');
+                breathingCircle.classList.add(currentStage.action);
+                statusText.textContent = `${currentStage.name} (Cykl ${currentCycle + 1}/${numCyclesInput.value})`;
+                instructionText.textContent = currentStage.instruction;
+
+                // Play sound if defined for this stage
+                if (currentStage.sound) {
+                    currentStage.sound();
+                }
+
+                // Handle the timer for each stage
+                stageTimer = currentStage.duration;
+                const stageInterval = setInterval(() => {
+                    if (!isRunning) {
+                        clearInterval(stageInterval);
+                        return;
+                    }
+
+                    stageTimer--;
+                    if (stageTimer <= 0) {
+                        clearInterval(stageInterval);
+                        stageIndex++;
+                        if (stageIndex >= stages.length) {
+                            stageIndex = 0; // Reset for the next cycle
+                            currentCycle++;
+                            if (currentCycle >= parseInt(numCyclesInput.value)) {
+                                resetApp();
+                                statusText.textContent = "Ćwiczenie zakończone!";
+                                instructionText.textContent = "Świetna robota! Kliknij 'Reset', aby zacząć od nowa.";
+                                return;
+                            }
+                        }
+                        runBreathingCycle();
+                    }
+                }, 1000);
+            }
+
+            // Start the main app timer
+            async function startTimer() {
+                if (isRunning) return;
+                
+                // Start the audio context with a user gesture
+                await Tone.start();
+                
+                updateStages(); // Get latest settings
+                currentCycle = 0;
+                stageIndex = 0;
+
+                isRunning = true;
+                startBtn.classList.add('hidden');
+                pauseBtn.classList.remove('hidden');
+                resetBtn.classList.remove('hidden');
+
+                intervalId = setInterval(() => {
+                    timer++;
+                    updateTimerDisplay();
+                }, 1000);
+
+                runBreathingCycle();
+            }
+
+            // Pause the app
+            function pauseTimer() {
+                isRunning = false;
+                clearInterval(intervalId);
+                pauseBtn.textContent = 'Wznów';
+                instructionText.textContent = 'Ćwiczenie wstrzymane.';
+                breathingCircle.classList.remove('pulsing');
+            }
+            
+            // Resume the app
+            function resumeTimer() {
+                isRunning = true;
+                startBtn.classList.add('hidden');
+                pauseBtn.classList.remove('hidden');
+                resetBtn.classList.remove('hidden');
+                pauseBtn.textContent = 'Pauza';
+                instructionText.textContent = 'Wznawianie ćwiczenia...';
+                
+                intervalId = setInterval(() => {
+                    timer++;
+                    updateTimerDisplay();
+                }, 1000);
+
+                runBreathingCycle();
+            }
+
+            // Reset the app
+            function resetApp() {
+                isRunning = false;
+                clearInterval(intervalId);
+                timer = 0;
+                stageIndex = 0;
+                stageTimer = 0;
+                currentCycle = 0;
+
+                updateTimerDisplay();
+                statusText.textContent = 'Gotowy?';
+                instructionText.textContent = 'Kliknij "Start", aby rozpocząć ćwiczenie.';
+                startBtn.classList.remove('hidden');
+                pauseBtn.classList.add('hidden');
+                resetBtn.classList.add('hidden');
+                breathingCircle.classList.remove('breathe-in', 'breathe-out', 'hold', 'pulsing');
+            }
+
+            // API call function with exponential backoff
+            async function callGeminiAPI(prompt, successCallback, errorCallback) {
+                const apiKey = ""; // API key will be provided by Canvas at runtime
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+                const payload = { contents: chatHistory };
+                
+                let retries = 0;
+                const maxRetries = 5;
+                const baseDelay = 1000; // 1 second
+
+                async function fetchWithRetry() {
+                    try {
+                        const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (response.status === 429 && retries < maxRetries) {
+                            const delay = baseDelay * Math.pow(2, retries) + Math.random() * 1000;
+                            retries++;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            return fetchWithRetry();
+                        }
+                        if (!response.ok) {
+                            throw new Error(`API call failed with status: ${response.status}`);
+                        }
+                        const result = await response.json();
+                        if (result.candidates && result.candidates.length > 0 &&
+                            result.candidates[0].content && result.candidates[0].content.parts &&
+                            result.candidates[0].content.parts.length > 0) {
+                            const text = result.candidates[0].content.parts[0].text;
+                            successCallback(text);
+                        } else {
+                            throw new Error("Invalid API response structure or no content.");
+                        }
+                    } catch (error) {
+                        errorCallback(error);
+                    }
+                }
+                fetchWithRetry();
+            }
+
+            // Event listeners for control buttons
+            startBtn.addEventListener('click', startTimer);
+            pauseBtn.addEventListener('click', () => {
+                if (isRunning) {
+                    pauseTimer();
+                } else {
+                    resumeTimer();
+                }
+            });
+            resetBtn.addEventListener('click', resetApp);
+            
+            settingsBtn.addEventListener('click', () => {
+                settingsPanel.classList.toggle('open');
+            });
+
+            closeSettingsBtn.addEventListener('click', () => {
+                settingsPanel.classList.remove('open');
+            });
+            
+            soundToggleBtn.addEventListener('click', () => {
+                soundOn = !soundOn;
+                soundToggleBtn.textContent = soundOn ? 'Dźwięk Włączony' : 'Dźwięk Wyłączony';
+            });
+
+            infoBtn.addEventListener('click', () => {
+                infoModal.style.display = 'flex';
+            });
+
+            infoCloseBtn.addEventListener('click', () => {
+                infoModal.style.display = 'none';
+            });
+
+            // Gemini API button listeners
+            generateTipsBtn.addEventListener('click', () => {
+                aiResponseContainer.classList.add('hidden');
+                generateTipsBtn.disabled = true;
+                generateTipsBtnText.classList.add('hidden');
+                tipsLoader.classList.remove('hidden');
+                const prompt = "Wygeneruj 3 krótkie, zwięzłe porady dla osoby początkującej, która ćwiczy wstrzymywanie oddechu do freedivingu. Użyj prostego języka.";
+                callGeminiAPI(prompt, (text) => {
+                    aiResponseText.textContent = text;
+                    aiResponseContainer.classList.remove('hidden');
+                    generateTipsBtn.disabled = false;
+                    generateTipsBtnText.classList.remove('hidden');
+                    tipsLoader.classList.add('hidden');
+                }, (error) => {
+                    console.error("Błąd podczas generowania porad:", error);
+                    aiResponseText.textContent = "Wystąpił błąd. Spróbuj ponownie.";
+                    aiResponseContainer.classList.remove('hidden');
+                    generateTipsBtn.disabled = false;
+                    generateTipsBtnText.classList.remove('hidden');
+                    tipsLoader.classList.add('hidden');
+                });
+            });
+
+            generateMotivationBtn.addEventListener('click', () => {
+                aiResponseContainer.classList.add('hidden');
+                generateMotivationBtn.disabled = true;
+                generateMotivationBtnText.classList.add('hidden');
+                motivationLoader.classList.remove('hidden');
+                const prompt = "Napisz krótkie, motywujące zdanie dla freedivera, który ma trudności z wstrzymywaniem oddechu. Zdanie powinno być pozytywne i dodawać otuchy. Zakończ je inspirującą metaforą związaną z wodą lub morzem. Napisz w języku polskim.";
+                callGeminiAPI(prompt, (text) => {
+                    aiResponseText.textContent = text;
+                    aiResponseContainer.classList.remove('hidden');
+                    generateMotivationBtn.disabled = false;
+                    generateMotivationBtnText.classList.remove('hidden');
+                    motivationLoader.classList.add('hidden');
+                }, (error) => {
+                    console.error("Błąd podczas generowania motywacji:", error);
+                    aiResponseText.textContent = "Wystąpił błąd. Spróbuj ponownie.";
+                    aiResponseContainer.classList.remove('hidden');
+                    generateMotivationBtn.disabled = false;
+                    generateMotivationBtnText.classList.remove('hidden');
+                    motivationLoader.classList.add('hidden');
+                });
+            });
+        });
+    </script>
+
+</body>
+</html>

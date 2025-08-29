@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asystent Wstrzymywania Oddechu</title>
+    <!-- Tailwind CSS for modern, responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js for web audio synthesis -->
+    <script src="https://unpkg.com/tone@14.7.58/build/Tone.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1b2a;
+            color: #e0e7ff;
+        }
+        .breathing-circle {
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            border: 4px solid #4a90e2;
+            box-shadow: 0 0 20px #4a90e2;
+            transition: transform 6s ease-in-out, opacity 0.5s ease-in-out;
+        }
+        .breathing-circle.active {
+            animation: pulse 1s linear infinite;
+        }
+        .breathing-circle.hold {
+            border: 4px solid #eab308;
+            box-shadow: 0 0 40px #eab308;
+        }
+        .status-message {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .info-modal {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 30;
+        }
+        .info-content {
+            background-color: #1e293b;
+            padding: 2rem;
+            border-radius: 1rem;
+            max-width: 500px;
+            text-align: center;
+            border: 2px solid #4a90e2;
+            position: relative;
+        }
+        .info-close-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #e0e7ff;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="bg-gray-800 p-8 md:p-12 rounded-2xl shadow-2xl w-full max-w-2xl border-2 border-cyan-500 relative">
+        <h1 class="text-4xl font-extrabold mb-4 text-center text-cyan-400">Asystent Wstrzymywania Oddechu</h1>
+        <p class="text-gray-300 text-center mb-8">
+            Ten asystent pomaga w treningu jednorazowego wstrzymania oddechu w 4-minutowym cyklu, zgodnie z metodą z tutorialu.
+        </p>
+
+        <!-- Information Icon Button at the top right -->
+        <button id="infoBtn" class="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors duration-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>
+        </button>
+
+        <div class="flex flex-col items-center justify-center space-y-8">
+            <!-- Breathing Circle -->
+            <div id="breathingCircle" class="breathing-circle bg-blue-500 bg-opacity-30 flex items-center justify-center">
+                <p id="statusText" class="status-message text-center text-cyan-200">Gotowy?</p>
+            </div>
+
+            <!-- Timer and Instructions -->
+            <div class="text-center">
+                <div id="timer" class="text-6xl font-bold text-teal-400 mb-2">04:00</div>
+                <p id="instructionText" class="text-lg text-gray-400">Kliknij "Start", aby rozpocząć cykl.</p>
+                <p id="cycleCount" class="text-sm text-gray-500 hidden"></p>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex flex-wrap justify-center gap-4">
+                <button id="startBtn" class="py-3 px-6 bg-green-600 hover:bg-green-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg">
+                    Start
+                </button>
+                <button id="stopBtn" class="py-3 px-6 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg hidden">
+                    Zakończ
+                </button>
+                <button id="resetBtn" class="py-3 px-6 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg hidden">
+                    Reset
+                </button>
+            </div>
+        </div>
+        
+        <!-- Settings Panel below main content -->
+        <div id="settingsPanel" class="mt-8 p-6 rounded-2xl shadow-inner border border-gray-700 bg-gray-900 w-full flex flex-col items-start space-y-4">
+            <h2 class="text-2xl font-bold text-teal-300">Ustawienia</h2>
+            <label class="block w-full">
+                <span class="text-gray-300">Czas treningu (minuty):</span>
+                <input type="number" id="trainingTimeInput" value="4" min="1" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+            <label class="block w-full">
+                <span class="text-gray-300">Liczba cykli:</span>
+                <input type="number" id="numCyclesInput" value="8" min="1" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+        </div>
+        
+        <!-- Footer with credit -->
+        <div class="mt-8 text-center text-gray-500 text-sm">
+            Made by Greg
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div id="infoModal" class="info-modal">
+        <div class="info-content">
+            <button id="infoCloseBtn" class="info-close-btn">&times;</button>
+            <h2 class="text-2xl font-bold text-teal-300 mb-4">Informacje o aplikacji</h2>
+            <p class="text-gray-300 mb-4">
+                Ta aplikacja pomaga w treningu pojedynczego, długiego wstrzymania oddechu w ramach ustalonego czasu.
+                Celem jest, aby cała sekwencja oddechowa i wstrzymanie zmieściły się w zadanym limicie.
+            </p>
+            <p class="text-gray-300 text-sm">
+                Ćwiczenia są inspirowane poradnikiem wideo "How to Hold Your Breath Longer: a freediving tutorial from a professional freediver"
+                autorstwa Adama Sterna. Cała zasługa za tę metodę należy do niego.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const breathingCircle = document.getElementById('breathingCircle');
+            const statusText = document.getElementById('statusText');
+            const timerDisplay = document.getElementById('timer');
+            const instructionText = document.getElementById('instructionText');
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const infoBtn = document.getElementById('infoBtn');
+            const infoModal = document.getElementById('infoModal');
+            const infoCloseBtn = document.getElementById('infoCloseBtn');
+            const trainingTimeInput = document.getElementById('trainingTimeInput');
+            const numCyclesInput = document.getElementById('numCyclesInput');
+            const cycleCountDisplay = document.getElementById('cycleCount');
+
+            // Initialize Tone.js for web audio synthesis
+            const synth = new Tone.Synth().toDestination();
+
+            let totalSeconds = 4 * 60; // Default 4 minutes
+            let intervalId;
+            let isRunning = false;
+            let timeoutId;
+            let currentCycle = 0;
+            let maxCycles = 0;
+
+            // Function to play a gentle 'breathe in' sound (rising tone)
+            function playStartSound() {
+                synth.triggerAttackRelease("C4", "8n");
+            }
+
+            // Function to play a gentle 'breathe out' sound (falling tone)
+            function playEndSound() {
+                synth.triggerAttackRelease("G3", "8n");
+            }
+
+
+            function updateTimerDisplay() {
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }
+
+            function startTimer() {
+                if (isRunning) return;
+                isRunning = true;
+                
+                // Get the total time and number of cycles from the input and convert to seconds
+                const minutes = parseInt(trainingTimeInput.value);
+                totalSeconds = minutes * 60;
+                maxCycles = parseInt(numCyclesInput.value);
+                currentCycle++;
+
+                updateTimerDisplay();
+
+                startBtn.classList.add('hidden');
+                stopBtn.classList.remove('hidden');
+                resetBtn.classList.add('hidden');
+                breathingCircle.classList.add('active');
+                
+                statusText.textContent = 'Przygotuj się...';
+                instructionText.textContent = 'Wykonaj serię oddechów przygotowawczych, a następnie weź ostatni wdech.';
+                cycleCountDisplay.textContent = `Cykl ${currentCycle}/${maxCycles}`;
+                cycleCountDisplay.classList.remove('hidden');
+
+                // Play sound to signal start of hold
+                timeoutId = setTimeout(() => {
+                    if (isRunning) {
+                        breathingCircle.classList.remove('active');
+                        breathingCircle.classList.add('hold');
+                        statusText.textContent = 'Wstrzymaj oddech!';
+                        instructionText.textContent = 'Trzymaj tak długo, jak możesz.';
+                        playStartSound(); // Play sound to signal breath hold
+                    }
+                }, 10 * 1000); // Wait 10 seconds for initial breaths before hold starts
+
+                intervalId = setInterval(() => {
+                    totalSeconds--;
+                    updateTimerDisplay();
+
+                    if (totalSeconds <= 0) {
+                        playEndSound(); // Play sound to signal end of time
+                        endHold('Czas minął!');
+                    }
+                }, 1000);
+            }
+
+            function endHold(message) {
+                if (!isRunning) return;
+                isRunning = false;
+                clearInterval(intervalId);
+                clearTimeout(timeoutId);
+                
+                breathingCircle.classList.remove('active', 'hold');
+                statusText.textContent = message;
+                instructionText.textContent = '';
+                stopBtn.classList.add('hidden');
+                resetBtn.classList.remove('hidden');
+                startBtn.classList.add('hidden');
+
+                const finalTime = (parseInt(trainingTimeInput.value) * 60) - totalSeconds;
+                instructionText.textContent = `Twój czas wstrzymania: ${finalTime} sekund.`;
+                
+                if (currentCycle < maxCycles) {
+                    setTimeout(() => {
+                        startTimer();
+                    }, 5000); // 5 second break before next cycle
+                } else {
+                    statusText.textContent = 'Trening zakończony!';
+                    instructionText.textContent = `Ukończyłeś wszystkie ${maxCycles} cykle. Świetna robota!`;
+                    resetBtn.classList.remove('hidden');
+                    startBtn.classList.add('hidden');
+                }
+            }
+
+            function resetApp() {
+                isRunning = false;
+                clearInterval(intervalId);
+                clearTimeout(timeoutId);
+                totalSeconds = parseInt(trainingTimeInput.value) * 60;
+                currentCycle = 0;
+                updateTimerDisplay();
+                
+                breathingCircle.classList.remove('active', 'hold');
+                statusText.textContent = 'Gotowy?';
+                instructionText.textContent = 'Kliknij "Start", aby rozpocząć cykl.';
+                cycleCountDisplay.classList.add('hidden');
+                
+                startBtn.classList.remove('hidden');
+                startBtn.textContent = 'Start';
+                stopBtn.classList.add('hidden');
+                resetBtn.classList.add('hidden');
+            }
+            
+            startBtn.addEventListener('click', () => {
+                Tone.start();
+                startTimer();
+            });
+            stopBtn.addEventListener('click', () => {
+                Tone.start();
+                endHold('Wstrzymanie oddechu zakończone!');
+            });
+            resetBtn.addEventListener('click', resetApp);
+            
+            infoBtn.addEventListener('click', () => {
+                infoModal.style.display = 'flex';
+            });
+            infoCloseBtn.addEventListener('click', () => {
+                infoModal.style.display = 'none';
+            });
+        });
+    </script>
+
+</body>
+</html>
