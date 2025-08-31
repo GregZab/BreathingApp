@@ -50,7 +50,9 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .info-modal {
+        
+        /* Styles for modals (reused from the other app) */
+        .modal {
             position: fixed;
             inset: 0;
             background-color: rgba(0, 0, 0, 0.7);
@@ -59,7 +61,7 @@
             justify-content: center;
             z-index: 30;
         }
-        .info-content {
+        .modal-content {
             background-color: #1e293b;
             padding: 2rem;
             border-radius: 1rem;
@@ -68,7 +70,7 @@
             border: 2px solid #4a90e2;
             position: relative;
         }
-        .info-close-btn {
+        .modal-close-btn {
             position: absolute;
             top: 0.5rem;
             right: 0.5rem;
@@ -76,6 +78,10 @@
             border: none;
             font-size: 1.5rem;
             color: #e0e7ff;
+            cursor: pointer;
+        }
+        .modal.open {
+            display: flex;
         }
     </style>
 </head>
@@ -118,20 +124,13 @@
                 <button id="resetBtn" class="py-3 px-6 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg hidden">
                     Reset
                 </button>
+                <button id="settingsBtn" class="py-3 px-4 bg-gray-600 hover:bg-gray-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg">
+                    Ustawienia
+                </button>
+                <button id="soundToggleBtn" class="py-3 px-4 bg-gray-600 hover:bg-gray-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg">
+                    Dźwięk Włączony
+                </button>
             </div>
-        </div>
-        
-        <!-- Settings Panel below main content -->
-        <div id="settingsPanel" class="mt-8 p-6 rounded-2xl shadow-inner border border-gray-700 bg-gray-900 w-full flex flex-col items-start space-y-4">
-            <h2 class="text-2xl font-bold text-teal-300">Ustawienia</h2>
-            <label class="block w-full">
-                <span class="text-gray-300">Czas treningu (minuty):</span>
-                <input type="number" id="trainingTimeInput" value="4" min="1" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-            </label>
-            <label class="block w-full">
-                <span class="text-gray-300">Liczba cykli:</span>
-                <input type="number" id="numCyclesInput" value="8" min="1" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-            </label>
         </div>
         
         <!-- Footer with credit -->
@@ -140,10 +139,33 @@
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-2xl font-bold text-teal-300">Ustawienia</h2>
+            <p class="text-gray-300 text-sm mb-4">Poniżej możesz dostosować parametry ćwiczeń.</p>
+            
+            <label class="block w-full text-left my-2">
+                <span class="text-gray-300">Czas treningu (minuty):</span>
+                <input type="number" id="trainingTimeInput" value="4" min="1" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+            <label class="block w-full text-left my-2">
+                <span class="text-gray-300">Liczba cykli:</span>
+                <input type="number" id="numCyclesInput" value="8" min="1" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+            
+            <div class="flex flex-wrap justify-center gap-4 mt-6">
+                <button id="saveSettingsBtn" class="py-2 px-6 bg-blue-600 hover:bg-blue-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg">
+                    Zapisz i Zamknij
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Info Modal -->
-    <div id="infoModal" class="info-modal">
+    <div id="infoModal" class="modal">
         <div class="info-content">
-            <button id="infoCloseBtn" class="info-close-btn">&times;</button>
+            <button id="infoCloseBtn" class="modal-close-btn">&times;</button>
             <h2 class="text-2xl font-bold text-teal-300 mb-4">Informacje o aplikacji</h2>
             <p class="text-gray-300 mb-4">
                 Ta aplikacja pomaga w treningu pojedynczego, długiego wstrzymania oddechu w ramach ustalonego czasu.
@@ -171,6 +193,12 @@
             const trainingTimeInput = document.getElementById('trainingTimeInput');
             const numCyclesInput = document.getElementById('numCyclesInput');
             const cycleCountDisplay = document.getElementById('cycleCount');
+            
+            // New elements
+            const settingsBtn = document.getElementById('settingsBtn');
+            const settingsModal = document.getElementById('settingsModal');
+            const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+            const soundToggleBtn = document.getElementById('soundToggleBtn');
 
             // Initialize Tone.js for web audio synthesis
             const synth = new Tone.Synth().toDestination();
@@ -188,27 +216,36 @@
             const INHALE_DURATION = 4;
             const EXHALE_DURATION = 8;
             const WARMUP_TOTAL_TIME = 120; // 2 minutes
+            let soundOn = true;
 
             // Function to play a gentle 'breathe in' sound (rising tone)
             function playInhaleSound() {
-                const now = Tone.now();
-                synth.triggerAttackRelease("C4", "2n", now);
-                synth.triggerAttackRelease("E4", "2n", now + 0.5);
+                if (soundOn) {
+                    const now = Tone.now();
+                    synth.triggerAttackRelease("C4", "2n", now);
+                    synth.triggerAttackRelease("E4", "2n", now + 0.5);
+                }
             }
 
             // Function to play a gentle 'breathe out' sound (falling tone)
             function playExhaleSound() {
-                const now = Tone.now();
-                synth.triggerAttackRelease("E4", "2n", now);
-                synth.triggerAttackRelease("C4", "2n", now + 0.5);
+                if (soundOn) {
+                    const now = Tone.now();
+                    synth.triggerAttackRelease("E4", "2n", now);
+                    synth.triggerAttackRelease("C4", "2n", now + 0.5);
+                }
             }
 
             function playStartSound() {
-                synth.triggerAttackRelease("C4", "8n");
+                if (soundOn) {
+                    synth.triggerAttackRelease("C4", "8n");
+                }
             }
 
             function playEndSound() {
-                synth.triggerAttackRelease("G3", "8n");
+                if (soundOn) {
+                    synth.triggerAttackRelease("G3", "8n");
+                }
             }
             
             function updateTimerDisplay() {
@@ -225,6 +262,8 @@
                 startBtn.classList.add('hidden');
                 stopBtn.classList.remove('hidden');
                 resetBtn.classList.remove('hidden');
+                settingsBtn.classList.add('hidden');
+                soundToggleBtn.classList.add('hidden');
                 
                 totalSeconds = WARMUP_TOTAL_TIME;
                 statusText.textContent = 'Rozgrzewka: wdech i wydech';
@@ -315,9 +354,6 @@
                 statusText.textContent = message;
                 instructionText.textContent = '';
                 stopBtn.classList.add('hidden');
-                resetBtn.classList.remove('hidden');
-                startBtn.classList.remove('hidden');
-                startBtn.textContent = 'Start';
                 
                 if (currentCycle < maxCycles) {
                     statusText.textContent = 'Przerwa...';
@@ -331,6 +367,8 @@
                     instructionText.textContent = `Ukończyłeś wszystkie ${maxCycles} cykle. Świetna robota!`;
                     resetBtn.classList.remove('hidden');
                     startBtn.classList.add('hidden');
+                    settingsBtn.classList.remove('hidden');
+                    soundToggleBtn.classList.remove('hidden');
                 }
             }
 
@@ -358,6 +396,8 @@
                 startBtn.textContent = 'Start';
                 stopBtn.classList.add('hidden');
                 resetBtn.classList.add('hidden');
+                settingsBtn.classList.remove('hidden');
+                soundToggleBtn.classList.remove('hidden');
             }
             
             startBtn.addEventListener('click', () => {
@@ -380,15 +420,42 @@
                 stopBtn.classList.add('hidden');
                 startBtn.classList.remove('hidden');
                 resetBtn.classList.remove('hidden');
+                settingsBtn.classList.remove('hidden');
+                soundToggleBtn.classList.remove('hidden');
             });
             
             resetBtn.addEventListener('click', resetApp);
             
             infoBtn.addEventListener('click', () => {
-                infoModal.style.display = 'flex';
+                infoModal.classList.add('open');
             });
             infoCloseBtn.addEventListener('click', () => {
-                infoModal.style.display = 'none';
+                infoModal.classList.remove('open');
+            });
+            infoModal.addEventListener('click', (e) => {
+                if (e.target.id === 'infoModal') {
+                    infoModal.classList.remove('open');
+                }
+            });
+            
+            // New event listeners for settings modal and sound toggle
+            settingsBtn.addEventListener('click', () => {
+                settingsModal.classList.add('open');
+            });
+
+            saveSettingsBtn.addEventListener('click', () => {
+                settingsModal.classList.remove('open');
+            });
+
+            settingsModal.addEventListener('click', (e) => {
+                if (e.target.id === 'settingsModal') {
+                    settingsModal.classList.remove('open');
+                }
+            });
+
+            soundToggleBtn.addEventListener('click', () => {
+                soundOn = !soundOn;
+                soundToggleBtn.textContent = soundOn ? 'Dźwięk Włączony' : 'Dźwięk Wyłączony';
             });
             
             // Initial timer display update
