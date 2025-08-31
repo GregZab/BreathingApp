@@ -46,41 +46,18 @@
         .pulsing {
             animation: pulse 1s linear infinite;
         }
-        /* Style for the settings button and panel */
-        .settings-btn {
-            background-color: #1e293b;
-            padding: 0.5rem;
-            border-radius: 50%;
-            cursor: pointer;
-            z-index: 10;
-        }
-        .settings-panel {
-            position: absolute;
-            top: 0;
-            right: -100%; /* Start off-screen */
-            height: 100%;
-            width: 300px;
-            background-color: #1e293b;
-            border-left: 2px solid #4a90e2;
-            transition: right 0.3s ease-in-out;
-            z-index: 20;
-            padding: 2rem;
-        }
-        .settings-panel.open {
-            right: 0;
-        }
-
-        /* Style for the info modal */
-        .info-modal {
+        
+        /* Style for the info and settings modals */
+        .modal {
             position: fixed;
             inset: 0;
             background-color: rgba(0, 0, 0, 0.7);
-            display: none; /* Changed from hidden to none */
+            display: none;
             align-items: center;
             justify-content: center;
             z-index: 30;
         }
-        .info-content {
+        .modal-content {
             background-color: #1e293b;
             padding: 2rem;
             border-radius: 1rem;
@@ -89,7 +66,7 @@
             border: 2px solid #4a90e2;
             position: relative;
         }
-        .info-close-btn {
+        .modal-close-btn {
             position: absolute;
             top: 0.5rem;
             right: 0.5rem;
@@ -97,6 +74,10 @@
             border: none;
             font-size: 1.5rem;
             color: #e0e7ff;
+            cursor: pointer;
+        }
+        .modal.open {
+            display: flex;
         }
 
         /* Loading spinner */
@@ -179,37 +160,43 @@
                 <p id="aiResponseText" class="text-gray-200"></p>
             </div>
         </div>
+    </div>
 
-
-        <!-- Settings Panel -->
-        <div id="settingsPanel" class="settings-panel flex flex-col items-start space-y-4">
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
             <h2 class="text-2xl font-bold text-teal-300">Ustawienia</h2>
-            <label class="block w-full">
+            <p class="text-gray-300 text-sm mb-4">Poniżej możesz dostosować parametry ćwiczeń.</p>
+            
+            <label class="block w-full text-left my-2">
                 <span class="text-gray-300">Wdech (sekundy):</span>
                 <input type="number" id="breatheInDuration" value="4" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
             </label>
-            <label class="block w-full">
+            <label class="block w-full text-left my-2">
                 <span class="text-gray-300">Wstrzymanie (sekundy):</span>
                 <input type="number" id="holdDuration" value="4" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
             </label>
-            <label class="block w-full">
+            <label class="block w-full text-left my-2">
                 <span class="text-gray-300">Wydech (sekundy):</span>
                 <input type="number" id="breatheOutDuration" value="6" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
             </label>
-            <label class="block w-full">
+            <label class="block w-full text-left my-2">
                 <span class="text-gray-300">Liczba cykli:</span>
                 <input type="number" id="numCycles" value="3" min="1" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
             </label>
-            <button id="closeSettingsBtn" class="w-full py-2 px-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg">
-                Zamknij
-            </button>
+            
+            <div class="flex flex-wrap justify-center gap-4 mt-6">
+                <button id="saveSettingsBtn" class="py-2 px-6 bg-blue-600 hover:bg-blue-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg">
+                    Zapisz i Zamknij
+                </button>
+            </div>
         </div>
     </div>
 
     <!-- Info Modal -->
-    <div id="infoModal" class="info-modal hidden">
-        <div class="info-content">
-            <button id="infoCloseBtn" class="info-close-btn">&times;</button>
+    <div id="infoModal" class="modal">
+        <div class="modal-content">
+            <button id="infoCloseBtn" class="modal-close-btn">&times;</button>
             <h2 class="text-2xl font-bold text-teal-300 mb-4">Informacje o aplikacji</h2>
             <p class="text-gray-300 mb-4">
                 Ta aplikacja została stworzona, aby pomóc w ćwiczeniach oddechowych do freedivingu. Opiera się na technikach i wiedzy,
@@ -233,8 +220,11 @@
             const resetBtn = document.getElementById('resetBtn');
             const settingsBtn = document.getElementById('settingsBtn');
             const soundToggleBtn = document.getElementById('soundToggleBtn');
-            const settingsPanel = document.getElementById('settingsPanel');
-            const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+            
+            // New modal elements
+            const settingsModal = document.getElementById('settingsModal');
+            const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+
             const infoBtn = document.getElementById('infoBtn');
             const infoModal = document.getElementById('infoModal');
             const infoCloseBtn = document.getElementById('infoCloseBtn');
@@ -468,25 +458,42 @@
             });
             resetBtn.addEventListener('click', resetApp);
             
+            // Open settings modal
             settingsBtn.addEventListener('click', () => {
-                settingsPanel.classList.toggle('open');
-            });
-
-            closeSettingsBtn.addEventListener('click', () => {
-                settingsPanel.classList.remove('open');
+                settingsModal.classList.add('open');
             });
             
+            // Save settings and close modal
+            saveSettingsBtn.addEventListener('click', () => {
+                updateStages(); // Save new settings
+                settingsModal.classList.remove('open');
+            });
+
+            // Close modal by clicking outside of it
+            settingsModal.addEventListener('click', (e) => {
+                if (e.target.id === 'settingsModal') {
+                    settingsModal.classList.remove('open');
+                }
+            });
+
             soundToggleBtn.addEventListener('click', () => {
                 soundOn = !soundOn;
                 soundToggleBtn.textContent = soundOn ? 'Dźwięk Włączony' : 'Dźwięk Wyłączony';
             });
 
             infoBtn.addEventListener('click', () => {
-                infoModal.style.display = 'flex';
+                infoModal.classList.add('open');
             });
 
             infoCloseBtn.addEventListener('click', () => {
-                infoModal.style.display = 'none';
+                infoModal.classList.remove('open');
+            });
+            
+            // Close info modal by clicking outside
+            infoModal.addEventListener('click', (e) => {
+                if (e.target.id === 'infoModal') {
+                    infoModal.classList.remove('open');
+                }
             });
 
             // Gemini API button listeners
@@ -535,6 +542,5 @@
             });
         });
     </script>
-
 </body>
 </html>
