@@ -79,6 +79,9 @@
             font-size: 1.5rem;
             color: #e0e7ff;
         }
+        .info-modal.open {
+            display: flex;
+        }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center min-h-screen p-4">
@@ -176,12 +179,27 @@
     <div id="infoModal" class="info-modal">
         <div class="info-content">
             <button id="infoCloseBtn" class="info-close-btn">&times;</button>
-            <h2 class="text-2xl font-bold text-teal-300 mb-4">Informacje o aplikacji</h2>
+            <h2 class="text-2xl font-bold text-teal-300 mb-4">Jak wykonać ćwiczenie</h2>
             <p class="text-gray-300 mb-4">
-                Ta aplikacja prowadzi przez kontrolowany cykl oddychania, składający się z faz głębokich wdechów i wydechów, po których następuje wstrzymanie oddechu.
+                Ten trening składa się z cykli kontrolowanego oddychania, po których następuje wstrzymanie oddechu.
+            </p>
+            <h3 class="text-xl font-bold text-teal-300 mb-2">Cykl składa się z 3 faz:</h3>
+            <ul class="text-gray-300 text-left list-none space-y-2 mb-4">
+                <li>
+                    <strong>Głębokie oddechy (30x):</strong> Wykonaj serię około 30 szybkich, głębokich wdechów i wydechów. Skup się na wypełnieniu brzucha, klatki piersiowej i ramion.
+                </li>
+                <li>
+                    <strong>Wstrzymanie po wydechu:</strong> Po ostatnim wydechu wstrzymaj oddech tak długo, jak możesz. Nie forsuj się.
+                </li>
+                <li>
+                    <strong>Wstrzymanie po wdechu (15s):</strong> Kiedy poczujesz potrzebę wdechu, weź głęboki oddech i wstrzymaj go na 15 sekund.
+                </li>
+            </ul>
+            <p class="text-gray-300 mb-4">
+                Aplikacja poprowadzi Cię przez 3 pełne cykle. Liczbę cykli, liczbę oddechów w cyklu oraz czasy wstrzymania możesz dostosować w panelu Ustawienia na dole strony.
             </p>
             <p class="text-gray-300 text-sm">
-                Ćwiczenia są inspirowane metodą oddechową Wima Hofa, mającą na celu zwiększenie energii i odporności.
+                Pamiętaj, aby zawsze słuchać swojego ciała i nie forsować wstrzymania oddechu na siłę.
             </p>
         </div>
     </div>
@@ -388,8 +406,13 @@
             startBtn.addEventListener('click', startSession);
             stopBtn.addEventListener('click', endSession);
             resetBtn.addEventListener('click', resetApp);
-            infoBtn.addEventListener('click', () => infoModal.style.display = 'flex');
-            infoCloseBtn.addEventListener('click', () => infoModal.style.display = 'none');
+            infoBtn.addEventListener('click', () => infoModal.classList.add('open'));
+            infoCloseBtn.addEventListener('click', () => infoModal.classList.remove('open'));
+            infoModal.addEventListener('click', (e) => {
+                if (e.target.id === 'infoModal') {
+                    infoModal.classList.remove('open');
+                }
+            });
 
             slowSpeedBtn.addEventListener('click', () => { 
                 breathSpeed = 4000;
