@@ -28,6 +28,15 @@
         .breathing-circle.hold {
             border: 4px solid #eab308;
             box-shadow: 0 0 40px #eab308;
+            transition: transform 1s ease-in-out, opacity 0.5s ease-in-out;
+        }
+        .breathe-in {
+            transform: scale(1.2);
+            box-shadow: 0 0 40px #4a90e2;
+        }
+        .breathe-out {
+            transform: scale(0.8);
+            box-shadow: 0 0 10px #4a90e2;
         }
         .status-message {
             font-size: 1.5rem;
@@ -38,20 +47,11 @@
             50% { transform: scale(1.05); }
             100% { transform: scale(1); }
         }
-        .loader {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid #fff;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .pulsing {
+            animation: pulse 1s linear infinite;
         }
         
-        /* Styles for modals (reused from the other app) */
+        /* Style for the info and settings modals */
         .modal {
             position: fixed;
             inset: 0;
@@ -83,6 +83,20 @@
         .modal.open {
             display: flex;
         }
+
+        /* Loading spinner */
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center min-h-screen p-4">
@@ -90,7 +104,7 @@
     <div class="bg-gray-800 p-8 md:p-12 rounded-2xl shadow-2xl w-full max-w-2xl border-2 border-cyan-500 relative">
         <h1 class="text-4xl font-extrabold mb-4 text-center text-cyan-400">Asystent Wstrzymywania Oddechu</h1>
         <p class="text-gray-300 text-center mb-8">
-            Ten asystent pomaga w treningu jednorazowego wstrzymania oddechu w 4-minutowym cyklu, zgodnie z metodą z tutorialu.
+            Asystent oddychania do freedivingu.
         </p>
 
         <!-- Information Icon Button at the top right -->
@@ -102,15 +116,14 @@
 
         <div class="flex flex-col items-center justify-center space-y-8">
             <!-- Breathing Circle -->
-            <div id="breathingCircle" class="breathing-circle bg-blue-500 bg-opacity-30 flex items-center justify-center">
+            <div id="breathingCircle" class="breathing-circle bg-blue-500 bg-opacity-30 flex items-center justify-center transition-all duration-1000">
                 <p id="statusText" class="status-message text-center text-cyan-200">Gotowy?</p>
             </div>
 
             <!-- Timer and Instructions -->
             <div class="text-center">
                 <div id="timer" class="text-6xl font-bold text-teal-400 mb-2">00:00</div>
-                <p id="instructionText" class="text-lg text-gray-400">Kliknij "Start", aby rozpocząć cykl.</p>
-                <p id="cycleCount" class="text-sm text-gray-500 hidden"></p>
+                <p id="instructionText" class="text-lg text-gray-400">Kliknij "Start", aby rozpocząć ćwiczenie.</p>
             </div>
 
             <!-- Controls -->
@@ -118,10 +131,10 @@
                 <button id="startBtn" class="py-3 px-6 bg-green-600 hover:bg-green-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg">
                     Start
                 </button>
-                <button id="stopBtn" class="py-3 px-6 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg hidden">
-                    Zakończ
+                <button id="pauseBtn" class="py-3 px-6 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg hidden">
+                    Pauza
                 </button>
-                <button id="resetBtn" class="py-3 px-6 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg hidden">
+                <button id="resetBtn" class="py-3 px-6 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg hidden">
                     Reset
                 </button>
                 <button id="settingsBtn" class="py-3 px-4 bg-gray-600 hover:bg-gray-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg">
@@ -132,10 +145,24 @@
                 </button>
             </div>
         </div>
-        
-        <!-- Footer with credit -->
-        <div class="mt-8 text-center text-gray-500 text-sm">
-            Made by Greg
+
+        <!-- Gemini API features section -->
+        <div class="mt-12 text-center space-y-4">
+            <h2 class="text-2xl font-bold text-cyan-400">✨ Funkcje AI</h2>
+            <div class="flex flex-col md:flex-row justify-center items-center space-y-4 md:space-y-0 md:space-x-4">
+                <button id="generateTipsBtn" class="w-full md:w-auto py-3 px-6 bg-purple-600 hover:bg-purple-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg flex items-center justify-center space-x-2">
+                    <span id="generateTipsBtnText">Wygeneruj Porady</span>
+                    <span id="tipsLoader" class="loader hidden"></span>
+                </button>
+                <button id="generateMotivationBtn" class="w-full md:w-auto py-3 px-6 bg-orange-600 hover:bg-orange-700 rounded-lg text-lg font-semibold transition-transform transform hover:scale-105 duration-300 shadow-lg flex items-center justify-center space-x-2">
+                    <span id="generateMotivationBtnText">Wygeneruj Motywację</span>
+                    <span id="motivationLoader" class="loader hidden"></span>
+                </button>
+            </div>
+            
+            <div id="aiResponseContainer" class="mt-6 p-4 rounded-lg text-left bg-gray-700 hidden">
+                <p id="aiResponseText" class="text-gray-200"></p>
+            </div>
         </div>
     </div>
 
@@ -146,12 +173,20 @@
             <p class="text-gray-300 text-sm mb-4">Poniżej możesz dostosować parametry ćwiczeń.</p>
             
             <label class="block w-full text-left my-2">
-                <span class="text-gray-300">Czas treningu (minuty):</span>
-                <input type="number" id="trainingTimeInput" value="4" min="1" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                <span class="text-gray-300">Wdech (sekundy):</span>
+                <input type="number" id="breatheInDuration" value="4" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+            <label class="block w-full text-left my-2">
+                <span class="text-gray-300">Wstrzymanie (sekundy):</span>
+                <input type="number" id="holdDuration" value="2" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            </label>
+            <label class="block w-full text-left my-2">
+                <span class="text-gray-300">Wydech (sekundy):</span>
+                <input type="number" id="breatheOutDuration" value="8" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
             </label>
             <label class="block w-full text-left my-2">
                 <span class="text-gray-300">Liczba cykli:</span>
-                <input type="number" id="numCyclesInput" value="8" min="1" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                <input type="number" id="numCycles" value="3" min="1" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
             </label>
             
             <div class="flex flex-wrap justify-center gap-4 mt-6">
@@ -164,16 +199,36 @@
 
     <!-- Info Modal -->
     <div id="infoModal" class="modal">
-        <div class="info-content">
+        <div class="modal-content">
             <button id="infoCloseBtn" class="modal-close-btn">&times;</button>
-            <h2 class="text-2xl font-bold text-teal-300 mb-4">Informacje o aplikacji</h2>
+            <h2 class="text-2xl font-bold text-teal-300 mb-4">Cel Ćwiczenia</h2>
             <p class="text-gray-300 mb-4">
-                Ta aplikacja pomaga w treningu pojedynczego, długiego wstrzymania oddechu w ramach ustalonego czasu.
-                Celem jest, aby cała sekwencja oddechowa i wstrzymanie zmieściły się w zadanym limicie.
+                Ten trening ma na celu stopniowe wydłużanie czasu wstrzymania oddechu poprzez serię 4-minutowych cykli. Każdy cykl składa się z jednej długiej próby wstrzymania oddechu i kontrolowanego oddychania. Całość jest inspirowana metodą Adama Sterna.
             </p>
+            <h3 class="text-xl font-bold text-teal-300 mb-2">Rozgrzewka (2 min)</h3>
+            <p class="text-gray-300 mb-4">
+                Aplikacja poprowadzi Cię przez 2 minuty delikatnych oddechów. Wdychaj lekko i delikatnie przez 4 sekundy, a następnie wydechaj przez 8 sekund.
+            </p>
+            <h3 class="text-xl font-bold text-teal-300 mb-2">Cykl (4 minuty)</h3>
+            <p class="text-gray-300 mb-4">
+                Ten cykl należy powtórzyć 8 razy.
+            </p>
+            <ul class="text-gray-300 text-left list-none space-y-2 mb-4">
+                <li>
+                    <strong>Głęboki Wdech i Wstrzymanie Oddechu:</strong> Na początku 4-minutowego cyklu weź jeden, głęboki wdech, wypełniając płuca i przeponę powietrzem. Następnie wstrzymaj oddech na tak długo, jak możesz.
+                </li>
+                <li>
+                    <strong>Oddychanie Uzupełniające:</strong> Po wstrzymaniu oddechu, gdy poczujesz potrzebę wzięcia oddechu, rozpocznij spokojne i rytmiczne oddychanie przez pozostały czas z 4-minutowego cyklu.
+                </li>
+                <li>
+                    <strong>Przykład:</strong> Jeśli Twoje wstrzymanie oddechu trwało 2 minuty, masz jeszcze 2 minuty na spokojne oddychanie. Jeśli wytrzymasz tylko 1 minutę, zostają Ci 3 minuty na oddychanie.
+                </li>
+                <li>
+                    <strong>Rytm oddychania:</strong> Oddychaj w rytmie 4-sekundowego wdechu (z krótką pauzą) i 8-sekundowego wydechu. Aplikacja pokieruje Cię przez ten proces.
+                </li>
+            </ul>
             <p class="text-gray-300 text-sm">
-                Ćwiczenia są inspirowane poradnikiem wideo "How to Hold Your Breath Longer: a freediving tutorial from a professional freediver"
-                autorstwa Adama Sterna. Cała zasługa za tę metodę należy do niego.
+                Pamiętaj, aby zawsze słuchać swojego ciała i nie forsować wstrzymania oddechu na siłę.
             </p>
         </div>
     </div>
@@ -185,268 +240,260 @@
             const timerDisplay = document.getElementById('timer');
             const instructionText = document.getElementById('instructionText');
             const startBtn = document.getElementById('startBtn');
-            const stopBtn = document.getElementById('stopBtn');
+            const pauseBtn = document.getElementById('pauseBtn');
             const resetBtn = document.getElementById('resetBtn');
+            const settingsBtn = document.getElementById('settingsBtn');
+            const soundToggleBtn = document.getElementById('soundToggleBtn');
+            
+            // New modal elements
+            const settingsModal = document.getElementById('settingsModal');
+            const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+
             const infoBtn = document.getElementById('infoBtn');
             const infoModal = document.getElementById('infoModal');
             const infoCloseBtn = document.getElementById('infoCloseBtn');
-            const trainingTimeInput = document.getElementById('trainingTimeInput');
-            const numCyclesInput = document.getElementById('numCyclesInput');
-            const cycleCountDisplay = document.getElementById('cycleCount');
-            
-            // New elements
-            const settingsBtn = document.getElementById('settingsBtn');
-            const settingsModal = document.getElementById('settingsModal');
-            const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-            const soundToggleBtn = document.getElementById('soundToggleBtn');
+            const generateTipsBtn = document.getElementById('generateTipsBtn');
+            const generateTipsBtnText = document.getElementById('generateTipsBtnText');
+            const tipsLoader = document.getElementById('tipsLoader');
+            const generateMotivationBtn = document.getElementById('generateMotivationBtn');
+            const generateMotivationBtnText = document.getElementById('generateMotivationBtnText');
+            const motivationLoader = document.getElementById('motivationLoader');
+            const aiResponseContainer = document.getElementById('aiResponseContainer');
+            const aiResponseText = document.getElementById('aiResponseText');
 
-            // Initialize Tone.js for web audio synthesis
-            const synth = new Tone.Synth().toDestination();
+            const breatheInInput = document.getElementById('breatheInDuration');
+            const holdInput = document.getElementById('holdDuration');
+            const breatheOutInput = document.getElementById('breatheOutDuration');
+            const numCyclesInput = document.getElementById('numCycles');
 
-            let totalSeconds = 0;
-            let intervalId = null;
+            let timer = 0;
             let isRunning = false;
-            let timeoutId = null;
-            let warmupIntervalId = null;
+            let intervalId;
+            let stageIndex = 0;
+            let stageTimer = 0;
             let currentCycle = 0;
-            let maxCycles = 0;
-            let warmupTimer = 0;
-            let isWarmupActive = false;
-            let warmupPhase = 'inhale';
-            const INHALE_DURATION = 4;
-            const EXHALE_DURATION = 8;
-            const WARMUP_TOTAL_TIME = 120; // 2 minutes
             let soundOn = true;
 
+            // Initialize Tone.js for audio feedback
+            const synth = new Tone.Synth().toDestination();
+
             // Function to play a gentle 'breathe in' sound (rising tone)
-            function playInhaleSound() {
-                if (soundOn) {
-                    const now = Tone.now();
-                    synth.triggerAttackRelease("C4", "2n", now);
-                    synth.triggerAttackRelease("E4", "2n", now + 0.5);
-                }
-            }
-
-            // Function to play a gentle 'breathe out' sound (falling tone)
-            function playExhaleSound() {
-                if (soundOn) {
-                    const now = Tone.now();
-                    synth.triggerAttackRelease("E4", "2n", now);
-                    synth.triggerAttackRelease("C4", "2n", now + 0.5);
-                }
-            }
-
-            function playStartSound() {
+            function playBreatheInSound() {
                 if (soundOn) {
                     synth.triggerAttackRelease("C4", "8n");
                 }
             }
 
-            function playEndSound() {
+            // Function to play a gentle 'breathe out' sound (falling tone)
+            function playBreatheOutSound() {
                 if (soundOn) {
                     synth.triggerAttackRelease("G3", "8n");
                 }
             }
-            
+
+            let stages = [];
+
+            function updateStages() {
+                const breatheInDur = parseInt(breatheInInput.value);
+                const holdDur = parseInt(holdInput.value);
+                const breatheOutDur = parseInt(breatheOutInput.value);
+                const numCycles = parseInt(numCyclesInput.value);
+
+                stages = [
+                    { name: 'Wdech', duration: breatheInDur, action: 'breathe-in', instruction: 'Głęboki wdech...', sound: playBreatheInSound },
+                    { name: 'Wstrzymanie', duration: holdDur, action: 'hold', instruction: 'Wstrzymaj oddech...', sound: null },
+                    { name: 'Wydech', duration: breatheOutDur, action: 'breathe-out', instruction: 'Powolny wydech...', sound: playBreatheOutSound },
+                    { name: 'Wstrzymanie (puste płuca)', duration: 4, action: 'hold', instruction: 'Wstrzymaj ponownie...', sound: null }
+                ];
+            }
+
+            updateStages(); // Initialize stages with default values
+
+            // Function to update the timer display
             function updateTimerDisplay() {
-                const minutes = Math.floor(totalSeconds / 60);
-                const seconds = totalSeconds % 60;
+                const minutes = Math.floor(timer / 60);
+                const seconds = timer % 60;
                 timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
             }
 
-            function startWarmup() {
-                if (isRunning) return;
-                isRunning = true;
-                isWarmupActive = true;
+            // Function to run the breathing cycle
+            function runBreathingCycle() {
+                if (!isRunning) return;
+
+                const currentStage = stages[stageIndex];
                 
-                startBtn.classList.add('hidden');
-                stopBtn.classList.remove('hidden');
-                resetBtn.classList.remove('hidden');
-                settingsBtn.classList.add('hidden');
-                soundToggleBtn.classList.add('hidden');
-                
-                totalSeconds = WARMUP_TOTAL_TIME;
-                statusText.textContent = 'Rozgrzewka: wdech i wydech';
-                breathingCircle.classList.add('active');
-                
-                warmupIntervalId = setInterval(() => {
-                    totalSeconds--;
-                    updateTimerDisplay();
-                    if (totalSeconds <= 0) {
-                        clearInterval(warmupIntervalId);
-                        isWarmupActive = false;
-                        startMainCycle();
+                // Update circle and text based on the stage
+                breathingCircle.classList.remove('breathe-in', 'breathe-out', 'hold');
+                breathingCircle.classList.add(currentStage.action);
+                statusText.textContent = `${currentStage.name} (Cykl ${currentCycle + 1}/${numCyclesInput.value})`;
+                instructionText.textContent = currentStage.instruction;
+
+                // Play sound if defined for this stage
+                if (currentStage.sound) {
+                    currentStage.sound();
+                }
+
+                // Handle the timer for each stage
+                stageTimer = currentStage.duration;
+                const stageInterval = setInterval(() => {
+                    if (!isRunning) {
+                        clearInterval(stageInterval);
+                        return;
+                    }
+
+                    stageTimer--;
+                    if (stageTimer <= 0) {
+                        clearInterval(stageInterval);
+                        stageIndex++;
+                        if (stageIndex >= stages.length) {
+                            stageIndex = 0; // Reset for the next cycle
+                            currentCycle++;
+                            if (currentCycle >= parseInt(numCyclesInput.value)) {
+                                resetApp();
+                                statusText.textContent = "Ćwiczenie zakończone!";
+                                instructionText.textContent = "Świetna robota! Kliknij 'Reset', aby zacząć od nowa.";
+                                return;
+                            }
+                        }
+                        runBreathingCycle();
                     }
                 }, 1000);
-
-                // Run the breathing visual/audio cues
-                runWarmupBreathing();
             }
 
-            function runWarmupBreathing() {
-                if (!isRunning || !isWarmupActive) {
-                    return;
-                }
+            // Start the main app timer
+            async function startTimer() {
+                if (isRunning) return;
                 
-                if (warmupTimer >= WARMUP_TOTAL_TIME) {
-                    return;
-                }
+                // Start the audio context with a user gesture
+                await Tone.start();
+                
+                updateStages(); // Get latest settings
+                currentCycle = 0;
+                stageIndex = 0;
 
-                if (warmupPhase === 'inhale') {
-                    breathingCircle.style.transform = `scale(1.1)`;
-                    instructionText.textContent = `Wdech na 50-60% pojemności płuc (${INHALE_DURATION} sekundy). Oddychaj lekko i delikatnie.`;
-                    playInhaleSound();
-                    warmupPhase = 'exhale';
-                    timeoutId = setTimeout(() => {
-                        warmupTimer += INHALE_DURATION;
-                        runWarmupBreathing();
-                    }, INHALE_DURATION * 1000);
-                } else {
-                    breathingCircle.style.transform = `scale(0.9)`;
-                    instructionText.textContent = `Wydech (${EXHALE_DURATION} sekund)`;
-                    playExhaleSound();
-                    warmupPhase = 'inhale';
-                    timeoutId = setTimeout(() => {
-                        warmupTimer += EXHALE_DURATION;
-                        runWarmupBreathing();
-                    }, EXHALE_DURATION * 1000);
-                }
-            }
-
-            function startMainCycle() {
-                // This clears any pending warm-up timeouts to prevent them from firing
-                clearTimeout(timeoutId);
-                
-                const minutes = parseInt(trainingTimeInput.value);
-                totalSeconds = minutes * 60;
-                maxCycles = parseInt(numCyclesInput.value);
-                currentCycle++;
-                
-                statusText.textContent = 'Wstrzymaj oddech!';
-                instructionText.textContent = 'Weź głęboki wdech i wstrzymaj oddech na tak długo, jak możesz.';
-                cycleCountDisplay.textContent = `Cykl ${currentCycle}/${maxCycles}`;
-                cycleCountDisplay.classList.remove('hidden');
-
-                breathingCircle.classList.remove('active');
-                breathingCircle.classList.add('hold');
-                
-                playStartSound();
-                updateTimerDisplay();
+                isRunning = true;
+                startBtn.classList.add('hidden');
+                pauseBtn.classList.remove('hidden');
+                resetBtn.classList.remove('hidden');
 
                 intervalId = setInterval(() => {
-                    totalSeconds--;
+                    timer++;
                     updateTimerDisplay();
-                    if (totalSeconds <= 0) {
-                        playEndSound();
-                        endHold('Czas minął!');
-                    }
                 }, 1000);
+
+                runBreathingCycle();
             }
 
-            function endHold(message) {
-                if (!isRunning) return;
+            // Pause the app
+            function pauseTimer() {
                 isRunning = false;
                 clearInterval(intervalId);
-                clearTimeout(timeoutId);
+                pauseBtn.textContent = 'Wznów';
+                instructionText.textContent = 'Ćwiczenie wstrzymane.';
+                breathingCircle.classList.remove('pulsing');
+            }
+            
+            // Resume the app
+            function resumeTimer() {
+                isRunning = true;
+                startBtn.classList.add('hidden');
+                pauseBtn.classList.remove('hidden');
+                resetBtn.classList.remove('hidden');
+                pauseBtn.textContent = 'Pauza';
+                instructionText.textContent = 'Wznawianie ćwiczenia...';
                 
-                breathingCircle.classList.remove('active', 'hold');
-                breathingCircle.style.transform = 'scale(1)';
-                statusText.textContent = message;
-                instructionText.textContent = '';
-                stopBtn.classList.add('hidden');
-                
-                if (currentCycle < maxCycles) {
-                    statusText.textContent = 'Przerwa...';
-                    instructionText.textContent = `Za chwilę rozpocznie się cykl ${currentCycle + 1}.`;
-                    setTimeout(() => {
-                        isRunning = true;
-                        startMainCycle();
-                    }, 5000);
-                } else {
-                    statusText.textContent = 'Trening zakończony!';
-                    instructionText.textContent = `Ukończyłeś wszystkie ${maxCycles} cykle. Świetna robota!`;
-                    resetBtn.classList.remove('hidden');
-                    startBtn.classList.add('hidden');
-                    settingsBtn.classList.remove('hidden');
-                    soundToggleBtn.classList.remove('hidden');
-                }
+                intervalId = setInterval(() => {
+                    timer++;
+                    updateTimerDisplay();
+                }, 1000);
+
+                runBreathingCycle();
             }
 
+            // Reset the app
             function resetApp() {
                 isRunning = false;
                 clearInterval(intervalId);
-                clearInterval(warmupIntervalId);
-                clearTimeout(timeoutId);
-                
-                totalSeconds = 0;
+                timer = 0;
+                stageIndex = 0;
+                stageTimer = 0;
                 currentCycle = 0;
-                warmupTimer = 0;
-                warmupPhase = 'inhale';
-                isWarmupActive = false;
-                
+
                 updateTimerDisplay();
-                
-                breathingCircle.classList.remove('active', 'hold');
-                breathingCircle.style.transform = 'scale(1)';
                 statusText.textContent = 'Gotowy?';
-                instructionText.textContent = 'Kliknij "Start", aby rozpocząć cykl.';
-                cycleCountDisplay.classList.add('hidden');
-                
+                instructionText.textContent = 'Kliknij "Start", aby rozpocząć ćwiczenie.';
                 startBtn.classList.remove('hidden');
-                startBtn.textContent = 'Start';
-                stopBtn.classList.add('hidden');
+                pauseBtn.classList.add('hidden');
                 resetBtn.classList.add('hidden');
-                settingsBtn.classList.remove('hidden');
-                soundToggleBtn.classList.remove('hidden');
+                breathingCircle.classList.remove('breathe-in', 'breathe-out', 'hold', 'pulsing');
             }
-            
-            startBtn.addEventListener('click', () => {
-                Tone.start();
-                startWarmup();
-            });
 
-            stopBtn.addEventListener('click', () => {
-                // Clear all timers and stop the app completely
-                clearInterval(intervalId);
-                clearInterval(warmupIntervalId);
-                clearTimeout(timeoutId);
+            // API call function with exponential backoff
+            async function callGeminiAPI(prompt, successCallback, errorCallback) {
+                const apiKey = ""; // API key will be provided by Canvas at runtime
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+                const payload = { contents: chatHistory };
                 
-                isRunning = false;
-                
-                breathingCircle.classList.remove('active', 'hold');
-                statusText.textContent = 'Trening Zatrzymany.';
-                instructionText.textContent = 'Kliknij "Start", aby kontynuować lub "Reset", aby zacząć od nowa.';
+                let retries = 0;
+                const maxRetries = 5;
+                const baseDelay = 1000; // 1 second
 
-                stopBtn.classList.add('hidden');
-                startBtn.classList.remove('hidden');
-                resetBtn.classList.remove('hidden');
-                settingsBtn.classList.remove('hidden');
-                soundToggleBtn.classList.remove('hidden');
-            });
-            
-            resetBtn.addEventListener('click', resetApp);
-            
-            infoBtn.addEventListener('click', () => {
-                infoModal.classList.add('open');
-            });
-            infoCloseBtn.addEventListener('click', () => {
-                infoModal.classList.remove('open');
-            });
-            infoModal.addEventListener('click', (e) => {
-                if (e.target.id === 'infoModal') {
-                    infoModal.classList.remove('open');
+                async function fetchWithRetry() {
+                    try {
+                        const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (response.status === 429 && retries < maxRetries) {
+                            const delay = baseDelay * Math.pow(2, retries) + Math.random() * 1000;
+                            retries++;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            return fetchWithRetry();
+                        }
+                        if (!response.ok) {
+                            throw new Error(`API call failed with status: ${response.status}`);
+                        }
+                        const result = await response.json();
+                        if (result.candidates && result.candidates.length > 0 &&
+                            result.candidates[0].content && result.candidates[0].content.parts &&
+                            result.candidates[0].content.parts.length > 0) {
+                            const text = result.candidates[0].content.parts[0].text;
+                            successCallback(text);
+                        } else {
+                            throw new Error("Invalid API response structure or no content.");
+                        }
+                    } catch (error) {
+                        errorCallback(error);
+                    }
+                }
+                fetchWithRetry();
+            }
+
+            // Event listeners for control buttons
+            startBtn.addEventListener('click', startTimer);
+            pauseBtn.addEventListener('click', () => {
+                if (isRunning) {
+                    pauseTimer();
+                } else {
+                    resumeTimer();
                 }
             });
+            resetBtn.addEventListener('click', resetApp);
             
-            // New event listeners for settings modal and sound toggle
+            // Open settings modal
             settingsBtn.addEventListener('click', () => {
                 settingsModal.classList.add('open');
             });
-
+            
+            // Save settings and close modal
             saveSettingsBtn.addEventListener('click', () => {
+                updateStages(); // Save new settings
                 settingsModal.classList.remove('open');
             });
 
+            // Close modal by clicking outside of it
             settingsModal.addEventListener('click', (e) => {
                 if (e.target.id === 'settingsModal') {
                     settingsModal.classList.remove('open');
@@ -457,11 +504,67 @@
                 soundOn = !soundOn;
                 soundToggleBtn.textContent = soundOn ? 'Dźwięk Włączony' : 'Dźwięk Wyłączony';
             });
+
+            infoBtn.addEventListener('click', () => {
+                infoModal.classList.add('open');
+            });
+
+            infoCloseBtn.addEventListener('click', () => {
+                infoModal.classList.remove('open');
+            });
             
-            // Initial timer display update
-            updateTimerDisplay();
+            // Close info modal by clicking outside
+            infoModal.addEventListener('click', (e) => {
+                if (e.target.id === 'infoModal') {
+                    infoModal.classList.remove('open');
+                }
+            });
+
+            // Gemini API button listeners
+            generateTipsBtn.addEventListener('click', () => {
+                aiResponseContainer.classList.add('hidden');
+                generateTipsBtn.disabled = true;
+                generateTipsBtnText.classList.add('hidden');
+                tipsLoader.classList.remove('hidden');
+                const prompt = "Wygeneruj 3 krótkie, zwięzłe porady dla osoby początkującej, która ćwiczy wstrzymywanie oddechu do freedivingu. Użyj prostego języka.";
+                callGeminiAPI(prompt, (text) => {
+                    aiResponseText.textContent = text;
+                    aiResponseContainer.classList.remove('hidden');
+                    generateTipsBtn.disabled = false;
+                    generateTipsBtnText.classList.remove('hidden');
+                    tipsLoader.classList.add('hidden');
+                }, (error) => {
+                    console.error("Błąd podczas generowania porad:", error);
+                    aiResponseText.textContent = "Wystąpił błąd. Spróbuj ponownie.";
+                    aiResponseContainer.classList.remove('hidden');
+                    generateTipsBtn.disabled = false;
+                    generateTipsBtnText.classList.remove('hidden');
+                    tipsLoader.classList.add('hidden');
+                });
+            });
+
+            generateMotivationBtn.addEventListener('click', () => {
+                aiResponseContainer.classList.add('hidden');
+                generateMotivationBtn.disabled = true;
+                generateMotivationBtnText.classList.add('hidden');
+                motivationLoader.classList.remove('hidden');
+                const prompt = "Napisz krótkie, motywujące zdanie dla freedivera, który ma trudności z wstrzymywaniem oddechu. Zdanie powinno być pozytywne i dodawać otuchy. Zakończ je inspirującą metaforą związaną z wodą lub morzem. Napisz w języku polskim.";
+                callGeminiAPI(prompt, (text) => {
+                    aiResponseText.textContent = text;
+                    aiResponseContainer.classList.remove('hidden');
+                    generateMotivationBtn.disabled = false;
+                    generateMotivationBtnText.classList.remove('hidden');
+                    motivationLoader.classList.add('hidden');
+                }, (error) => {
+                    console.error("Błąd podczas generowania motywacji:", error);
+                    aiResponseText.textContent = "Wystąpił błąd. Spróbuj ponownie.";
+                    aiResponseContainer.classList.remove('hidden');
+                    generateMotivationBtn.disabled = false;
+                    generateMotivationBtnText.classList.remove('hidden');
+                    motivationLoader.classList.add('hidden');
+                });
+            });
         });
     </script>
-
 </body>
 </html>
