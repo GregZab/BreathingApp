@@ -102,7 +102,7 @@
 
             <!-- Timer and Instructions -->
             <div class="text-center">
-                <div id="timer" class="text-6xl font-bold text-teal-400 mb-2">04:00</div>
+                <div id="timer" class="text-6xl font-bold text-teal-400 mb-2">00:00</div>
                 <p id="instructionText" class="text-lg text-gray-400">Kliknij "Start", aby rozpocząć cykl.</p>
                 <p id="cycleCount" class="text-sm text-gray-500 hidden"></p>
             </div>
@@ -175,69 +175,130 @@
             // Initialize Tone.js for web audio synthesis
             const synth = new Tone.Synth().toDestination();
 
-            let totalSeconds = 4 * 60; // Default 4 minutes
-            let intervalId;
+            let totalSeconds = 0;
+            let intervalId = null;
             let isRunning = false;
-            let timeoutId;
+            let timeoutId = null;
+            let warmupIntervalId = null;
             let currentCycle = 0;
             let maxCycles = 0;
+            let warmupTimer = 0;
+            let isWarmupActive = false;
+            let warmupPhase = 'inhale';
+            const INHALE_DURATION = 4;
+            const EXHALE_DURATION = 8;
+            const WARMUP_TOTAL_TIME = 120; // 2 minutes
 
             // Function to play a gentle 'breathe in' sound (rising tone)
+            function playInhaleSound() {
+                const now = Tone.now();
+                synth.triggerAttackRelease("C4", "2n", now);
+                synth.triggerAttackRelease("E4", "2n", now + 0.5);
+            }
+
+            // Function to play a gentle 'breathe out' sound (falling tone)
+            function playExhaleSound() {
+                const now = Tone.now();
+                synth.triggerAttackRelease("E4", "2n", now);
+                synth.triggerAttackRelease("C4", "2n", now + 0.5);
+            }
+
             function playStartSound() {
                 synth.triggerAttackRelease("C4", "8n");
             }
 
-            // Function to play a gentle 'breathe out' sound (falling tone)
             function playEndSound() {
                 synth.triggerAttackRelease("G3", "8n");
             }
-
-
+            
             function updateTimerDisplay() {
                 const minutes = Math.floor(totalSeconds / 60);
                 const seconds = totalSeconds % 60;
                 timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
             }
 
-            function startTimer() {
+            function startWarmup() {
                 if (isRunning) return;
                 isRunning = true;
+                isWarmupActive = true;
                 
-                // Get the total time and number of cycles from the input and convert to seconds
+                startBtn.classList.add('hidden');
+                stopBtn.classList.remove('hidden');
+                resetBtn.classList.remove('hidden');
+                
+                totalSeconds = WARMUP_TOTAL_TIME;
+                statusText.textContent = 'Rozgrzewka: wdech i wydech';
+                breathingCircle.classList.add('active');
+                
+                warmupIntervalId = setInterval(() => {
+                    totalSeconds--;
+                    updateTimerDisplay();
+                    if (totalSeconds <= 0) {
+                        clearInterval(warmupIntervalId);
+                        isWarmupActive = false;
+                        startMainCycle();
+                    }
+                }, 1000);
+
+                // Run the breathing visual/audio cues
+                runWarmupBreathing();
+            }
+
+            function runWarmupBreathing() {
+                if (!isRunning || !isWarmupActive) {
+                    return;
+                }
+                
+                if (warmupTimer >= WARMUP_TOTAL_TIME) {
+                    return;
+                }
+
+                if (warmupPhase === 'inhale') {
+                    breathingCircle.style.transform = `scale(1.1)`;
+                    instructionText.textContent = `Wdech na 50-60% pojemności płuc (${INHALE_DURATION} sekundy). Oddychaj lekko i delikatnie.`;
+                    playInhaleSound();
+                    warmupPhase = 'exhale';
+                    timeoutId = setTimeout(() => {
+                        warmupTimer += INHALE_DURATION;
+                        runWarmupBreathing();
+                    }, INHALE_DURATION * 1000);
+                } else {
+                    breathingCircle.style.transform = `scale(0.9)`;
+                    instructionText.textContent = `Wydech (${EXHALE_DURATION} sekund)`;
+                    playExhaleSound();
+                    warmupPhase = 'inhale';
+                    timeoutId = setTimeout(() => {
+                        warmupTimer += EXHALE_DURATION;
+                        runWarmupBreathing();
+                    }, EXHALE_DURATION * 1000);
+                }
+            }
+
+            function startMainCycle() {
+                // This clears any pending warm-up timeouts to prevent them from firing
+                clearTimeout(timeoutId);
+                
                 const minutes = parseInt(trainingTimeInput.value);
                 totalSeconds = minutes * 60;
                 maxCycles = parseInt(numCyclesInput.value);
                 currentCycle++;
-
-                updateTimerDisplay();
-
-                startBtn.classList.add('hidden');
-                stopBtn.classList.remove('hidden');
-                resetBtn.classList.add('hidden');
-                breathingCircle.classList.add('active');
                 
-                statusText.textContent = 'Przygotuj się...';
-                instructionText.textContent = 'Wykonaj serię oddechów przygotowawczych, a następnie weź ostatni wdech.';
+                statusText.textContent = 'Wstrzymaj oddech!';
+                instructionText.textContent = 'Weź głęboki wdech i wstrzymaj oddech na tak długo, jak możesz.';
                 cycleCountDisplay.textContent = `Cykl ${currentCycle}/${maxCycles}`;
                 cycleCountDisplay.classList.remove('hidden');
 
-                // Play sound to signal start of hold
-                timeoutId = setTimeout(() => {
-                    if (isRunning) {
-                        breathingCircle.classList.remove('active');
-                        breathingCircle.classList.add('hold');
-                        statusText.textContent = 'Wstrzymaj oddech!';
-                        instructionText.textContent = 'Trzymaj tak długo, jak możesz.';
-                        playStartSound(); // Play sound to signal breath hold
-                    }
-                }, 10 * 1000); // Wait 10 seconds for initial breaths before hold starts
+                breathingCircle.classList.remove('active');
+                breathingCircle.classList.add('hold');
+                
+                playStartSound();
+                updateTimerDisplay();
 
                 intervalId = setInterval(() => {
                     totalSeconds--;
                     updateTimerDisplay();
-
                     if (totalSeconds <= 0) {
-                        playEndSound(); // Play sound to signal end of time
+                        playEndSound();
                         endHold('Czas minął!');
                     }
                 }, 1000);
@@ -250,19 +311,21 @@
                 clearTimeout(timeoutId);
                 
                 breathingCircle.classList.remove('active', 'hold');
+                breathingCircle.style.transform = 'scale(1)';
                 statusText.textContent = message;
                 instructionText.textContent = '';
                 stopBtn.classList.add('hidden');
                 resetBtn.classList.remove('hidden');
-                startBtn.classList.add('hidden');
-
-                const finalTime = (parseInt(trainingTimeInput.value) * 60) - totalSeconds;
-                instructionText.textContent = `Twój czas wstrzymania: ${finalTime} sekund.`;
+                startBtn.classList.remove('hidden');
+                startBtn.textContent = 'Start';
                 
                 if (currentCycle < maxCycles) {
+                    statusText.textContent = 'Przerwa...';
+                    instructionText.textContent = `Za chwilę rozpocznie się cykl ${currentCycle + 1}.`;
                     setTimeout(() => {
-                        startTimer();
-                    }, 5000); // 5 second break before next cycle
+                        isRunning = true;
+                        startMainCycle();
+                    }, 5000);
                 } else {
                     statusText.textContent = 'Trening zakończony!';
                     instructionText.textContent = `Ukończyłeś wszystkie ${maxCycles} cykle. Świetna robota!`;
@@ -274,12 +337,19 @@
             function resetApp() {
                 isRunning = false;
                 clearInterval(intervalId);
+                clearInterval(warmupIntervalId);
                 clearTimeout(timeoutId);
-                totalSeconds = parseInt(trainingTimeInput.value) * 60;
+                
+                totalSeconds = 0;
                 currentCycle = 0;
+                warmupTimer = 0;
+                warmupPhase = 'inhale';
+                isWarmupActive = false;
+                
                 updateTimerDisplay();
                 
                 breathingCircle.classList.remove('active', 'hold');
+                breathingCircle.style.transform = 'scale(1)';
                 statusText.textContent = 'Gotowy?';
                 instructionText.textContent = 'Kliknij "Start", aby rozpocząć cykl.';
                 cycleCountDisplay.classList.add('hidden');
@@ -292,12 +362,26 @@
             
             startBtn.addEventListener('click', () => {
                 Tone.start();
-                startTimer();
+                startWarmup();
             });
+
             stopBtn.addEventListener('click', () => {
-                Tone.start();
-                endHold('Wstrzymanie oddechu zakończone!');
+                // Clear all timers and stop the app completely
+                clearInterval(intervalId);
+                clearInterval(warmupIntervalId);
+                clearTimeout(timeoutId);
+                
+                isRunning = false;
+                
+                breathingCircle.classList.remove('active', 'hold');
+                statusText.textContent = 'Trening Zatrzymany.';
+                instructionText.textContent = 'Kliknij "Start", aby kontynuować lub "Reset", aby zacząć od nowa.';
+
+                stopBtn.classList.add('hidden');
+                startBtn.classList.remove('hidden');
+                resetBtn.classList.remove('hidden');
             });
+            
             resetBtn.addEventListener('click', resetApp);
             
             infoBtn.addEventListener('click', () => {
@@ -306,6 +390,9 @@
             infoCloseBtn.addEventListener('click', () => {
                 infoModal.style.display = 'none';
             });
+            
+            // Initial timer display update
+            updateTimerDisplay();
         });
     </script>
 
